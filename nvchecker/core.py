@@ -176,21 +176,50 @@ def json_encode(obj):
     return d
   raise TypeError(obj)
 
-def lock_source_nix(type: str, ref: str, target: str) -> str:
+def lock_source_nix(r: RichResult, conf: Entry) -> str:
+  type = conf.get("source")
+  target = conf.get(type)
+  submodules = conf.get("submodules", False)
+  if submodules and type in ["github", "gitlab"]:
+    # submodules only work with git
+    if type == "github":
+      target = f"git@{type}.com:{target}.git"
+    if type == "gitlab":
+      target = f"git@{type}.com:{target}.git"
+    type = "git"
+     
   if type in ["github", "gitlab"]:
+    # this is just an optimization fetching
+    # tar.gz archives instead of using git
     owner, _, repo = target.rpartition("/")
     owner = urllib.parse.quote_plus(owner)
-    ref = urllib.parse.quote_plus(ref)
-    fetchtree = f'type = "{type}"; owner = "{owner}"; repo = "{repo}"; ref = "{ref}";'
+    fetchtree = (
+      f'type = "{type}";'
+      f' owner = "{owner}";'
+      f' repo = "{repo}";'
+    )
+    if r.revision:
+      fetchtree += f' rev = "{r.revision}";'
+    else: 
+      ref = urllib.parse.quote_plus(r.gitref)
+      fetchtree += f' ref = "{ref}";'
     nix = (
       f'owner = "{owner}";'
       f' repo = "{repo}";'
     )
   if type in ["git"]:
-    url = target
-    fetchtree = f'type = "{type}"; url = "{url}"; ref = "{ref}"; shallow = true;'
+    fetchtree = (
+      f'type = "{type}";'
+      f' url = "{target}";'
+      f' submodules = {json.dumps(submodules)};'
+    )
+    if r.revision:
+      fetchtree += f' rev = "{r.revision}"; allRefs = true;'
+    elif ref: 
+      fetchtree += f' ref = "{r.gitref}";'
     nix = (
-      f'url = "{url}";'
+      f'url = {json.dumps(target)};'
+      f' submodules = {json.dumps(submodules)};'
     )
 
   command = [
@@ -214,7 +243,7 @@ def lock_source_nix(type: str, ref: str, target: str) -> str:
   except subprocess.CalledProcessError as e:
     error_message = "Locking the source in nix failed; stderr from the nix command: \n"
     error_message += e.stderr
-    logger.error(error_message, type=type, ref=ref)
+    logger.error(error_message, type=type, ref=r.gitref, rev=r.revision)
     raise e
 
 def write_nix_expr_files(opt: Options, entries: Entries, results: ResultData) -> None:
@@ -242,11 +271,8 @@ def write_nix_expr_files(opt: Options, entries: Entries, results: ResultData) ->
       conf = entries.get(name)
       file = opt.nix_expr_folder / (name + ".nix")
       logger.info("update nix", name=name, file=file)
-      type = conf.get("source")
-      target = conf.get(type)
-      ref = r.gitref or r.revision or r.version
       try:
-        fetchTreeArgs=lock_source_nix(type, ref, target)
+        fetchTreeArgs=lock_source_nix(r, conf)
       except:
         continue
       data = '{'
