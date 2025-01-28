@@ -183,9 +183,9 @@ def lock_source_nix(r: RichResult, conf: Entry) -> str:
   if submodules and type in ["github", "gitlab"]:
     # submodules only work with git
     if type == "github":
-      target = f"git@{type}.com:{target}.git"
+      target = f"https://{type}.com/{target}.git"
     if type == "gitlab":
-      target = f"git@{type}.com:{target}.git"
+      target = f"https://{type}.com/{target}.git"
     type = "git"
      
   if type in ["github", "gitlab"]:
