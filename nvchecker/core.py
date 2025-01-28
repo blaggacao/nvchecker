@@ -213,13 +213,10 @@ def lock_source_nix(r: RichResult, conf: Entry) -> str:
       f' url = "{target}";'
       f' submodules = {json.dumps(submodules)};'
     )
-    if r.revision:
-      fetchtree += f' rev = "{r.revision}"; allRefs = true;'
-    elif ref: 
-      fetchtree += f' ref = "{r.gitref}";'
+    fetchtree += f' rev = "{r.revision}"; allRefs = true;'
     nix = (
       f'url = {json.dumps(target)};'
-      f' submodules = {json.dumps(submodules)};'
+      f' submodules = {json.dumps(submodules)}; allRefs = true;'
     )
 
   command = [
