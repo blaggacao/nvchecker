@@ -85,6 +85,9 @@ def main() -> None:
     # Python < 3.10 will create an eventloop when asyncio.Queue is initialized
     results, has_failures = asyncio.get_event_loop().run_until_complete(run(result_coro, runner_coro))
 
+  if options.nix_expr_folder is not None:
+    core.write_nix_expr_files(options, entries, results)
+
   if options.ver_files is not None:
     newverf = options.ver_files[1]
     if args.entry:
@@ -94,9 +97,6 @@ def main() -> None:
       vers = {}
     vers.update(results)
     core.write_verfile(newverf, vers)
-
-  if options.nix_expr_folder is not None:
-    core.write_nix_expr_files(options, entries, results)
 
   if args.failures and has_failures:
     sys.exit(3)
